@@ -1,268 +1,234 @@
+from datetime import *
+
 class Dataform:
+  
+  # Lista com os deparas de tipagem
+  depara = {"NullType()": NullType(), "StringType()": StringType(), "BinaryType()": BinaryType(), "BooleanType()": BooleanType(), "DateType()": DateType(), "TimestampType()": TimestampType(),
+"DecimalType()": DecimalType(), "DoubleType()": DoubleType(), "FloatType()": FloatType(), "ByteType()": ByteType(), "IntegerType()": IntegerType(), "LongType()": LongType(), "ShortType()": ShortType(),
+"ArrayType(NullType())": ArrayType(NullType()), "ArrayType(StringType())": ArrayType(StringType()), "ArrayType(BinaryType())": ArrayType(BinaryType()), "ArrayType(BooleanType())": ArrayType(BooleanType()), "ArrayType(DateType())": ArrayType(DateType()), "ArrayType(TimestampType())": ArrayType(TimestampType()), "ArrayType(DecimalType())": ArrayType(DecimalType()), "ArrayType(DoubleType())": ArrayType(DoubleType()), "ArrayType(FloatType())": ArrayType(FloatType()), "ArrayType(ByteType())": ArrayType(ByteType()), "ArrayType(IntegerType())": ArrayType(IntegerType()), "ArrayType(LongType())": ArrayType(LongType()), 
+"ArrayType(ShortType())": ArrayType(ShortType())}
+  
+  # Referência de processamento
+  ref = str(datetime.today())[0:10]
+  
+  def __init__(self, Dataframe, Metadata=None):
     
-    def __init__(self, dataframe, colunas):
+    if not Metadata:
+      self.Dataframe = Dataframe
+      self.Metadata = []
+      
+      # Vamos inicializar a construção do metadata de cada variável
+      for coluna in self.Dataframe.columns:
+        info = {
+          "nome": coluna,
+          "origem": coluna,
+          "tipo": "StringType()",
+          "valor_se_nulo": None,
+          "dominio": None,
+          "transformacao": None,
+          "versao": self.ref
+        }
+        self.Metadata.append(info)
+    else:
+        self.Metadata = Metadata
         
-        self.dataframe = dataframe.select(colunas)
+        # A partir de um dado metadados fornecido pelo usuário, iniciaremos o Dataforming
+        # Etapa 01 - Pré seleção das colunas de origem
+        colunas = []
         
-        # --- METADATA --- #
-        self.metadata = [None, None, None, None, None, None, None]
-        self.coluna_transformada = {} #0
-        self.descricao = {} #1
-        self.tipo = {} #2
-        self.valor_se_nulo = {} #3
-        self.dominios = {} #4
-        self.transformacoes = {} #5
-        self.observacoes = {} #6
+        for info in self.Metadata:
+          if info["origem"] != None:
+            colunas.append(info["origem"])
+        self.Dataframe = Dataframe.select(colunas)
         
-        # Verifica na listagem de colunas de entrada se temos colunas do tipo struct, ou seja, escritas da seguinte forma colunaPai.colunaFilha.
-        # Nestes casos sempre pegar o último nome da hierarquia.
-        self.colunas = []
+        # Etapa 02 - Inicializa os módulos (Caster, Coalescer, Transformer, Domain, Namer)
+        # Faremos primeiro os casos sem origem
+        for info in self.Metadata:
+          if not info["origem"]:
+            self.transformedAs({info["nome"]: info["transformacao"]}, True)
+            self.coalescedAs({info["nome"]: info["valor_se_nulo"]}, True)
+            self.castedAs({info["nome"]: self.depara[info["tipo"]]}, True)
+            self.domainAs({info["nome"]: info["dominio"]}, True)
         
-        for coluna in colunas:
-            splitted = coluna.split(".")
-            self.colunas.append(splitted[-1])
-            self.coluna_transformada[splitted[-1]] = splitted[-1]
-            self.descricao[splitted[-1]] = None
-            self.tipo[splitted[-1]] = StringType()
-            self.valor_se_nulo[splitted[-1]] = None
-            self.dominios[splitted[-1]] = None
-            self.transformacoes[splitted[-1]] = None
-            self.observacoes[splitted[-1]] = None
-        self.metadata[0] = self.coluna_transformada
-        self.metadata[1] = self.descricao
-        self.metadata[2] = self.tipo
-        self.metadata[3] = self.valor_se_nulo
-        self.metadata[4] = self.dominios
-        self.metadata[5] = self.transformacoes
-        self.metadata[6] = self.observacoes
+        # Agora os casos que possuem origem
+        for info in self.Metadata:
+          if info["origem"]: 
+            self.transformedAs({info["origem"]: info["transformacao"]}, True)
+            self.coalescedAs({info["origem"]: info["valor_se_nulo"]}, True)
+            self.castedAs({info["origem"]: self.depara[info["tipo"]]}, True)
+            self.domainAs({info["origem"]: info["dominio"]}, True)
+            self.namedAs({info["origem"]: info["nome"]}, True)
+  
+  
+  # Método de atualização do metadados
+  def __updateMetadata__(self, col_list, dict_list):
+    # Verifica e insere informações novas
+    for coluna in [nova_coluna for nova_coluna in col_list if nova_coluna not in self.Dataframe.columns]:
+      self.Metadata.append({"nome": coluna, "origem": None, "tipo": StringType(), "valor_se_nulo": None, "dominio": None, "transformacao": None, "versao": self.ref})
     
-    
-    @property
-    # Retorna o metadados
-    def metadata(self):
-        return self.metadata
+    # Atualiza de fato o metadados
+    for info in self.Metadata:
+      if info["nome"] in col_list:
+        index = col_list.index(info["nome"])
+        dict = dict_list[index]
         
-        
-    @property
-    # Retorna o dataframe
-    def dataframe(self):
-        return self.dataframe
+        for chave in dict.keys():
+          info[chave] = dict[chave]
+      
+      
+  # Método de construção do dataframe para o metadados
+  def __buildMetadataDF__(self):
+    # Construção do header
+    meta_header = []
+    for chave in self.Metadata[0].keys():
+      meta_header.append(chave)
     
-    
-    # Contrói o dataframe do metadados (private method)
-    def __buildMetadata__(self):
-        meta_header = ["Destino <=== Origem", "Descrição", "Tipo", "Valor/Expressão se Nulo", "Domínios", "Transformações", "Observações"]
-        lst_rows = []
+    # Construção das linhas
+    lst_rows = []
+    for info in self.Metadata:
+      row = []
+      
+      for valor in info.values():
+        row.append(str(valor))
+      lst_rows.append(row)
+      
+    # Constrói o dataframe
+    meta_DF = spark.createDataFrame(lst_rows, meta_header)
 
-        for key in self.metadata[0].keys():
-            row = []
-    
-            for header in range(len(meta_header)):
-                if header == 0:
-                    row.append(self.metadata[0][key] + " <=== " + key)
-                else:
-                    row.append(str(self.metadata[header][self.metadata[0][key]]))
-                lst_rows.append(row)
-        
-        meta_df = spark.createDataFrame(lst_rows, meta_header) \
-            .withColumn("Versao", current_date()) \
-            .withColumn("meta_version", current_date()) \
-            .dropDuplicates()
-        
-        return meta_df
+    return meta_DF
     
     
-    # Update do metadados (private method)
-    def __metadataUpdate__(self, dict, info, index):
-        for coluna in dict.keys():
-            if index == 0:
-                try:
-                    self.metadata[index][coluna]
-                    self.coluna_transformada[coluna] = str(dict[coluna])
-                    
-                    self.descricao[dict[coluna]] = self.descricao[coluna]
-                    self.tipo[dict[coluna]] = self.tipo[coluna]
-                    self.valor_se_nulo[dict[coluna]] = self.valor_se_nulo[coluna]
-                    self.dominios[dict[coluna]] = self.dominios[coluna]
-                    self.transformacoes[dict[coluna]] = self.transformacoes[coluna]
-                    self.observacoes[dict[coluna]] = self.observacoes[coluna]
-                
-                    del self.descricao[coluna]
-                    del self.tipo[coluna]
-                    del self.valor_se_nulo[coluna]
-                    del self.dominios[coluna]
-                    del self.transformacoes[coluna]
-                    del self.observacoes[coluna]
-                except:
-                    try:
-                        new_var = True
-                        for key in self.coluna_transformada.keys():
-                            if self.coluna_transformada[key] == coluna:
-                                self.coluna_transformada[key] = str(dict[coluna])
-                                
-                                self.descricao[dict[coluna]] = self.descricao[coluna]
-                                self.tipo[dict[coluna]] = self.tipo[coluna]
-                                self.valor_se_nulo[dict[coluna]] = self.valor_se_nulo[coluna]
-                                self.dominios[dict[coluna]] = self.dominios[coluna]
-                                self.transformacoes[dict[coluna]] = self.transformacoes[coluna]
-                                self.observacoes[dict[coluna]] = self.observacoes[coluna]
-                                
-                                del self.descricao[coluna]
-                                del self.tipo[coluna]
-                                del self.valor_se_nulo[coluna]
-                                del self.dominios[coluna]
-                                del self.transformacoes[coluna]
-                                del self.observacoes[coluna]
-                                
-                                new_var = False
-                                break
-                        
-                        if new_var:
-                            raise ValueError
-                    except:
-                        self.coluna_transformada[coluna] = None
-            else:
-                info[coluna] = str(dict[coluna])
-            
-        self.metadata[index] = info
-        
-        
-    # Tratando a tipagem dos campos escolhidos pelo usuário
-    def castedAs(self, dict):
-        lst_casted = []
-        
-        for coluna in self.colunas:
-            if coluna in dict.keys():
-                casted = col(coluna).cast(dict[coluna])
-                aliased = casted.alias(coluna)
-            else:
-                aliased = col(coluna)
-            lst_casted.append(aliased)
-            
-        self.dataframe = self.dataframe.select(lst_casted)
-        self.colunas = self.dataframe.columns
-        
-        self.__metadataUpdate__(dict, self.tipo, 2)
-        return self.dataframe
-        
+  @property # Retorna o metadados
+  def metadata(self):
+    return self.Metadata
+  
+  
+  @property # Retorna o dataframe
+  def dataframe(self):
+    return self.Dataframe
+  
+  
+  # Módulo 01 - Alteração de tipagem dos campos
+  def castedAs(self, dict, imported_metadata=False):
+    lst_casted = []
     
-    # Tratando os valores nulos dos campos escolhidos pelo usuário
-    def coalescedAs(self, dict):
-        lst_coalesced = []
-            
-        for coluna in self.colunas:
-            if coluna in dict.keys():
-                try:
-                    self.dataframe.select(dict[coluna])
-                    coalesced = coalesce(col(coluna), dict[coluna])
-                except:
-                    coalesced = coalesce(col(coluna), lit(dict[coluna]))
-                aliased = coalesced.alias(coluna)
-            else:
-                aliased = col(coluna)
-            lst_coalesced.append(aliased)
-            
-        self.dataframe = self.dataframe.select(lst_coalesced)
-        self.colunas = self.dataframe.columns
-        
-        self.__metadataUpdate__(dict, self.valor_se_nulo, 3)
-        return self.dataframe
-        
+    for coluna in self.Dataframe.columns:
+      if coluna in dict.keys() and dict[coluna]:
+        casted = col(coluna).cast(dict[coluna])
+        aliased = casted.alias(coluna)
+        if not imported_metadata:
+          self.__updateMetadata__([coluna], [{"tipo": str(dict[coluna]) + "()", "versao": self.ref}])
+      else:
+        aliased = col(coluna)
+      lst_casted.append(aliased)
+      
+    self.Dataframe = self.Dataframe.select(lst_casted)
+    return self.Dataframe
+  
+  
+  # Módulo 02 - Tratamento de valores nulos
+  def coalescedAs(self, dict, imported_metadata=False):
+    lst_coalesced = []
     
-    # Realiza transformações dos campos escolhidos pelo usuário. Se o campo não existe na base ele é criado a partir de uma derivação.
-    def transformedAs(self, dict):
-        lst_transformed = []
+    for coluna in self.Dataframe.columns:
+      if coluna in dict.keys():
+        # Devemos checar primeiro se temos um valor a inserir ou uma expressão envolvendo uma ou mais colunas
+        try:
+          self.Dataframe.select(expr(dict[coluna]))
+          coalesced = coalesce(col(coluna), expr(dict[coluna]))
+        except:
+          coalesced = coalesce(col(coluna), lit(dict[coluna]))
+        finally:
+          aliased = coalesced.alias(coluna)
+          if not imported_metadata:
+            self.__updateMetadata__([coluna], [{"valor_se_nulo": dict[coluna], "versao": self.ref}])
+      else:
+          aliased = col(coluna)
+      lst_coalesced.append(aliased)
         
-        # Caso 01 - Coluna já existe no dataframe e só precisa ser transformada
-        for coluna in self.colunas:
-            if coluna in dict.keys():
-                transformed = dict[coluna]
-                aliased = transformed.alias(coluna)
-            else:
-                aliased = col(coluna)
-            lst_transformed.append(aliased)
-        
-        # Caso 02 - Coluna não existe no dataframe e precisa ser criada
-        for coluna in [colunas for colunas in dict.keys() if colunas not in self.colunas]:
-            transformed = dict[coluna]
-            aliased = transformed.alias(coluna)
-            lst_transformed.append(aliased)
-            self.__metadataUpdate__({coluna: None}, self.coluna_transformada, 0)
-            self.__metadataUpdate__({coluna: None}, self.descricao, 1)
-            self.__metadataUpdate__({coluna: StringType()}, self.tipo, 2)
-            self.__metadataUpdate__({coluna: None}, self.valor_se_nulo, 3)
-            self.__metadataUpdate__({coluna: None}, self.dominios, 4)
-            self.__metadataUpdate__({coluna: None}, self.observacoes, 6)
-            
-        self.dataframe = self.dataframe.select(lst_transformed)
-        self.colunas = self.dataframe.columns
-        
-        self.__metadataUpdate__(dict, self.transformacoes, 5)
-        return self.dataframe
-    
-    
-    # Renomeação dos campos escolhidos pelo usuário
-    def renamedAs(self, dict):
-        lst_renamed = []
-        
-        for coluna in self.colunas:
-            if coluna in dict.keys():
-                aliased = col(coluna).alias(dict[coluna])
-            else:
-                aliased = col(coluna)
-            lst_renamed.append(aliased)
-            
-        self.dataframe = self.dataframe.select(lst_renamed)
-        self.colunas = self.dataframe.columns
-        
-        self.__metadataUpdate__(dict, self.coluna_transformada, 0)
-        return self.dataframe
-    
-    
-    # Captura de domínios através de uma lista de variáveis introduzidas pelo usuário
-    def domainAs(self, lst):
-        for coluna in lst:
-            values = []
-            domains = self.dataframe.select(coluna).dropDuplicates().collect()
-            
-            for domain in domains:
-                values.append(str(domain[coluna]))
-                
-            self.__metadataUpdate__({coluna: values}, self.dominios, 4)
-            
-            
-    # Atualização do metadados a partir de informações inputadas pelo usuário
-    def inputMetadata(self, metadata):
-        infos = [self.coluna_transformada, self.descricao, self.tipo, self.valor_se_nulo, self.dominios, self.transformacoes, self.observacoes]
-        
-        for index, info in enumerate(metadata):
-            if info and infos[index] in [self.tipo, self.valor_se_nulo, self.transformacoes]:
-                if infos[index] == self.transformacoes:
-                    self.transformedAs(info)
-                elif infos[index] == self.tipo:
-                    self.castedAs(info)
-                elif infos[index] == self.valor_se_nulo:
-                    self.coalescedAs(info)
-                else:
-                    self.transformedAs(info)
-            elif info:
-                self.__metadataUpdate__(info, infos[index], index)
-                
-        return self.metadata
-    
-    
-    # Mostra o metadados em forma de dataframe para o usuário
-    def viewMetadata(self, option=True):
-        meta_df = self.__buildMetadata__()
-        meta_df.drop("meta_version").show(meta_df.count(), option)
-        
-    
-    # Grava o metadados no destino especificado pelo usuário. Formato csv particionado pela data de processamento.
-    def saveMetadata(self, destino):
-        meta_df = self.__buildMetadata__()
-        meta_df.coalesce(1).write.partitionBy("meta_version").mode("overwrite").format("csv").option("header", True).save(destino)
-        
-        print("> Metadados salvo com sucesso no diretório: {}".format(destino))
+    self.Dataframe = self.Dataframe.select(lst_coalesced)
+    return self.Dataframe
+  
+  
+  # Módulo 03 - Captura ou inserção da listagem de domínios
+  def domainAs(self, dict, imported_metadata=False):
+    if not imported_metadata:
+      for info in self.Metadata:
+        if info["nome"] in dict.keys():
+          # Verifica se necessitamos gerar este domínio através de um agrupamento na variável
+          try:
+            dominio = []
+            valores = self.Dataframe.select(dict[info["nome"]]).distinct().collect()
 
-
+            for valor in valores:
+              dominio.append(valor[info["nome"]])
+            info["dominio"] = dominio
+          except:
+            info["dominio"] = dict[info["nome"]]
+          info["versao"] = self.ref
+          
+    return self.Metadata
+  
+  
+  # Módulo 04 - Aplica transformações em colunas existentes ou cria colunas novas
+  def transformedAs(self, dict, imported_metadata=False):
+    lst_transformed = []
+    
+    # Caso 01 - Coluna já existente no dataframe
+    for coluna in self.Dataframe.columns:
+      if coluna in dict.keys() and dict[coluna]:
+        transformed = expr(dict[coluna])
+        aliased = transformed.alias(coluna)
+        if not imported_metadata:
+          self.__updateMetadata__([coluna], [{"transformacao": dict[coluna], "versao": self.ref}])
+      else:
+        aliased = col(coluna)
+      lst_transformed.append(aliased)
+        
+    # Caso 02 - Uma nova coluna a ser criada
+    for coluna in [nova_coluna for nova_coluna in dict.keys() if nova_coluna not in self.Dataframe.columns]:
+      transformed = expr(dict[coluna]).cast(StringType())
+      aliased = transformed.alias(coluna)
+      lst_transformed.append(aliased)
+      if not imported_metadata:
+        self.__updateMetadata__([coluna], [{"transformacao": dict[coluna], "versao": self.ref}])
+      
+    self.Dataframe = self.Dataframe.select(lst_transformed)
+    return self.Dataframe
+  
+  
+  # Módulo 05 - Renomeação de variáveis
+  def namedAs(self, dict, imported_metadata=False):
+    lst_named = []
+    
+    for coluna in self.Dataframe.columns:
+      if coluna in dict.keys() and dict[coluna]:
+        aliased = col(coluna).alias(dict[coluna])
+        if not imported_metadata:
+          self.__updateMetadata__([coluna], [{"nome": dict[coluna], "versao": self.ref}])
+      else:
+        aliased = col(coluna)
+      lst_named.append(aliased)
+    
+    self.Dataframe = self.Dataframe.select(lst_named)
+    return self.Dataframe
+  
+  
+  # Visualização do Metadados
+  def viewMetadata(self, truncate=True):
+    meta_DF = self.__buildMetadataDF__()
+    meta_DF = meta_DF.select(col("nome").alias("Nome"), col("origem").alias("Origem"), col("tipo").alias("Tipo"), col("valor_se_nulo").alias("Valor/Expressão(SQL) se Nulo"), 
+                             col("dominio").alias("Domínio"), col("transformacao").alias("Transformação(SQL)"), col("versao").alias("Versão"))
+    
+    return meta_DF.show(len(self.Metadata), truncate)
+  
+  
+  # Exportação do metadados para um diretório especificado pelo usuário
+  def saveMetadata(self, dir):
+    meta_DF = self.__buildMetadataDF__()
+    meta_DF.coalesce(1).write.mode("overwrite").format("json").save(dir)
+    
+    return "> Metadados exportado com SUCESSO para o diretório: {}.".format(dir)
+  
+    
 # End of Class   
