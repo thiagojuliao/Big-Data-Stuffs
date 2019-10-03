@@ -32,10 +32,10 @@ __saveMetadata()__|Exporta em formato *JSON* o metadados do objeto Dataform. Est
 
 Chave | Descrição
 ------|----------
-__nome__|Nome atribuído a variável transformada.
-__origem__|A qual variável oriunda do dataframe de origem que esta variável é derivada. Para variáveis criadas a partir apenas de transformações este valor é __None__.
-__tipo__|Tipagem dos dados que definem a variável.
-__valor_se_nulo__|Valor ou expressão *SQL* utlizados para tratamento de valores nulos.
-__dominio__|Informações sobre o domínio da variável.
-__transformacao__|Expressão *SQL* que define a geração da variável a partir de uma derivação.
-__versao__|Versão atribuída as chaves que compõe o Metadados. Sempre que há alteração em uma chave sua versão é modificada.
+"__nome__":|Nome atribuído a variável transformada.
+"__origem__":|A qual variável oriunda do dataframe de origem que esta variável é derivada. Para variáveis criadas a partir apenas de transformações este valor é __None__.
+"__tipo__":|Tipagem dos dados que definem a variável.
+"__valor_se_nulo__":|Valor ou expressão *SQL* utlizados para tratamento de valores nulos.
+"__dominio__":|Informações sobre o domínio da variável.
+"__transformacao__":|Expressão *SQL* que define a geração da variável a partir de uma derivação.
+"__versao__":|Versão atribuída as chaves que compõe o Metadados. Sempre que há alteração em uma chave sua versão é modificada.
