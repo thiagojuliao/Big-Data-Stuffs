@@ -25,3 +25,17 @@ Método | Descrição | Parâmetros
 -------|-----------|-----------
 __viewMetadata()__|Mostra em formato de dataframe o metadados para o usuário.|Escolha se o dataframe deve ser mostrado truncando as colunas ou não. __Default(True)__.
 __saveMetadata()__|Exporta em formato *JSON* o metadados do objeto Dataform. Este mesmo metadados serve de entrada para automaticamente construir todas as variáveis que foram criadas em uma execução anterior. Se for este o caso, utilizar da função formatadora de metadados __uploadMetadata()__ externa ao objeto Dataform.| Caminho do diretório para exportação.
+
+![view_Metadata()_print](view_metadata.JPG)
+
+>__Metadados__: O metadados é gerado/atualizado automaticamente a cada execução de módulo pelo usuário. A seguir veremos as descrições de cada chave que compõe o que chamamos de metadados do objeto Dataform. Futuramente podem ser adicionados mais campos conforme a necessidade.
+
+Chave | Descrição
+------|----------
+__nome__|Nome atribuído a variável transformada.
+__origem__|A qual variável oriunda do dataframe de origem que esta variável é derivada. Para variáveis criadas a partir apenas de transformações este valor é __None__.
+__tipo__|Tipagem dos dados que definem a variável.
+__valor_se_nulo__|Valor ou expressão *SQL* utlizados para tratamento de valores nulos.
+__dominio__|Informações sobre o domínio da variável.
+__transformacao__|Expressão *SQL* que define a geração da variável a partir de uma derivação.
+__versao__|Versão atribuída as chaves que compõe o Metadados. Sempre que há alteração em uma chave sua versão é modificada.
