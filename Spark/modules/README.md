@@ -23,5 +23,5 @@ __Namer__|Renomeia variáveis.|__namedAs()__|__nomes__ = {"AnonID": "id", "Query
 
 Método | Descrição | Parâmetros
 -------|-----------|-----------
-__viewMetadata()__|Mostra em formato de dataframe o metadados para o usuário.|Escolha se o dataframe deve ser mostradotruncando as colunas ou não. __Default(True)__.
+__viewMetadata()__|Mostra em formato de dataframe o metadados para o usuário.|Escolha se o dataframe deve ser mostrado truncando as colunas ou não. __Default(True)__.
 __saveMetadata()__|Exporta em formato *JSON* o metadados do objeto Dataform. Este mesmo metadados serve de entrada para automaticamente construir todas as variáveis que foram criadas em uma execução anterior. Se for este o caso, utilizar da função formatadora de metadados __uploadMetadata()__ externa ao objeto Dataform.| Caminho do diretório para exportação.
