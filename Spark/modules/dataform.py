@@ -34,37 +34,54 @@ class Dataform:
         
         # A partir de um dado metadados fornecido pelo usuário, iniciaremos o Dataforming
         # Etapa 01 - Pré seleção das colunas de origem
-        colunas = []
-        
-        for info in self.Metadata:
-          if info["origem"] != None:
-            colunas.append(info["origem"])
+        infos_com_origem = [info for info in self.Metadata if info["origem"]]
+        colunas = [info["origem"] for info in infos_com_origem]
         self.Dataframe = Dataframe.select(colunas)
         
         # Etapa 02 - Inicializa os módulos (Caster, Coalescer, Transformer, Domain, Namer)
         # Faremos primeiro os casos sem origem
-        for info in self.Metadata:
-          if not info["origem"]:
+        infos_sem_origem = [info for info in self.Metadata if not info["origem"]]
+        infos_de_grau_maiorigual_um = []
+        
+        for info in infos_sem_origem:
+          try:
             self.transformedAs({info["nome"]: info["transformacao"]}, True)
             self.coalescedAs({info["nome"]: info["valor_se_nulo"]}, True)
             self.castedAs({info["nome"]: self.depara[info["tipo"]]}, True)
             self.domainAs({info["nome"]: info["dominio"]}, True)
-        
+          except:
+            infos_de_grau_maiorigual_um.append(info)
+            
         # Agora os casos que possuem origem
-        for info in self.Metadata:
-          if info["origem"]: 
-            self.transformedAs({info["origem"]: info["transformacao"]}, True)
-            self.coalescedAs({info["origem"]: info["valor_se_nulo"]}, True)
-            self.castedAs({info["origem"]: self.depara[info["tipo"]]}, True)
-            self.domainAs({info["origem"]: info["dominio"]}, True)
-            self.namedAs({info["origem"]: info["nome"]}, True)
-  
-  
+        for info in infos_com_origem:
+          self.transformedAs({info["origem"]: info["transformacao"]}, True)
+          self.coalescedAs({info["origem"]: info["valor_se_nulo"]}, True)
+          self.castedAs({info["origem"]: self.depara[info["tipo"]]}, True)
+          self.domainAs({info["origem"]: info["dominio"]}, True)
+          self.namedAs({info["origem"]: info["nome"]}, True)
+          
+        # Por fim executa os módulos para as variáveis de grau maior ou iguais a 1
+        index = 0
+        
+        while infos_de_grau_maiorigual_um:
+          info = infos_de_grau_maiorigual_um[index]
+          
+          try:
+            self.transformedAs({info["nome"]: info["transformacao"]}, True)
+            self.coalescedAs({info["nome"]: info["valor_se_nulo"]}, True)
+            self.castedAs({info["nome"]: self.depara[info["tipo"]]}, True)
+            self.domainAs({info["nome"]: info["dominio"]}, True)
+            infos_de_grau_maiorigual_um.remove(info)
+            index = 0
+          except:
+            index += 1
+
+            
   # Método de atualização do metadados
   def __updateMetadata__(self, col_list, dict_list):
     # Verifica e insere informações novas
     for coluna in [nova_coluna for nova_coluna in col_list if nova_coluna not in self.Dataframe.columns]:
-      self.Metadata.append({"nome": coluna, "origem": None, "tipo": StringType(), "valor_se_nulo": None, "dominio": None, "transformacao": None, "versao": self.ref})
+      self.Metadata.append({"nome": coluna, "origem": None, "tipo": "StringType()", "valor_se_nulo": None, "dominio": None, "transformacao": None, "versao": self.ref})
     
     # Atualiza de fato o metadados
     for info in self.Metadata:
@@ -192,7 +209,7 @@ class Dataform:
       lst_transformed.append(aliased)
       if not imported_metadata:
         self.__updateMetadata__([coluna], [{"transformacao": dict[coluna], "versao": self.ref}])
-      
+        
     self.Dataframe = self.Dataframe.select(lst_transformed)
     return self.Dataframe
   
@@ -230,5 +247,5 @@ class Dataform:
     
     return "> Metadados exportado com SUCESSO para o diretório: {}.".format(dir)
   
-    
-# End of Class   
+ 
+# End of class
