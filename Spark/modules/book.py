@@ -1,3 +1,4 @@
+
 class Book(Dataform):
     
     depara_dias_segundos = {"d": 1, "s": 7, "m": 30, "a": 365, "h": 3600, "min": 60, "seg": 1}
