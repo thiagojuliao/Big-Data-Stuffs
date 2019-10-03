@@ -5,7 +5,7 @@ class Book(Dataform):
     
     def __init__(self, Dataframe, visao, data, Metadata=None):
         
-        self.Dataframe = Dataframe.select(visao).dropDuplicates().orderBy(visao)
+        self.Dataframe = Dataframe.select(visao).withColumn("dt_proc", current_date()).dropDuplicates().orderBy(visao)
         self.origem = Dataframe
         self.Metadata = []
         self.chave_primaria = visao
@@ -39,8 +39,10 @@ class Book(Dataform):
         # Se tivermos que retirar duplicidade
         if dict["duplicidade"]:
             publico = publico.dropDuplicates(dict["duplicidade"])
-                
-        return publico.select(min(self.chave_temporal), max(self.chave_temporal)).show()
+            
+        publico.select(min(self.chave_temporal), max(self.chave_temporal)).show()
+        
+        return publico
     
     
     # Módulo de construção de variáveis
@@ -49,6 +51,15 @@ class Book(Dataform):
         vars_sem_origem = [var for var in lst if not var["origem"]]
         
         # Inicia a construção das variáveis que possuem origem
-        for var in vars_com_origem:
-            self.__buildPublic__(var)
+        for info in vars_com_origem:
+            
+            # Etapa 01 - Gera Público
+            publico = self.__buildPublic__(info)
+            
+            # Etapa 02 - Agregação
+            agreg = publico.groupBy(self.chave_primaria).agg(info["agregacao"].alias(info["nome"]))
+            
+            # Etapa 03 - Recupera Público
+            self.Dataframe = self.Dataframe.join(agreg, on = [self.chave_primaria], how = "left")
+            
     
