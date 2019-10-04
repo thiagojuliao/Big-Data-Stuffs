@@ -1,4 +1,4 @@
-# Lista de Classes #
+# Lista de Classes do tipo Exception#
 
 # Erro de volumetria zerada
 class EmptyDataframeError(Exception):
