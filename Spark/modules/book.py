@@ -21,34 +21,40 @@ class Book(Dataform):
     
     # Constrói o público específico para a variável
     def __buildPublic__(self, dict):
+        
+        # Aplica filtro(s) no público caso necessário
+        if dict["filtro"]:
+          publico = self.origem.filter(dict["filtro"])
+        else:
+          publico = self.origem
+        
+        # Verifica se após o filtro o público possui volumetria, caso contrário aborta o processo e informa ao usuário
+        if publico.count() == 0:
+          raise EmptyDataframeError("O filtro para esta variável resultou em uma volumetria zerada. Verificar se a construção do filtro está correta.")
+          
+        # Aplica janelas de tempo
         if dict["janela_de_tempo"][1] in ["d", "s", "m", "a"]:
             inicio = date_add(current_date(), dict["janela_de_tempo"][0][0] * self.depara_dias_segundos[dict["janela_de_tempo"][1]])
             fim = date_add(current_date(), dict["janela_de_tempo"][0][1] * self.depara_dias_segundos[dict["janela_de_tempo"][1]])
             
-            publico = self.origem \
-                    .select(self.chave_primaria, dict["origem"], self.chave_temporal) \
-                    .filter(col(self.chave_temporal).between(inicio, fim))
+            publico = publico.filter(col(self.chave_temporal).between(inicio, fim))
         else:
             inicio = unix_timestamp() + dict["janela_de_tempo"][0][0] * self.depara_dias_segundos[dict["janela_de_tempo"][1]]
             fim = unix_timestamp() + dict["janela_de_tempo"][0][1] * self.depara_dias_segundos[dict["janela_de_tempo"][1]]
             
-            publico = self.origem \
-                    .select(self.chave_primaria, dict["origem"], self.chave_temporal) \
-                    .filter(unix_timestamp(col(self.chave_temporal)).between(inicio, fim))
+            publico = publico.filter(unix_timestamp(col(self.chave_temporal)).between(inicio, fim))
         
-        # Se tivermos que retirar duplicidade
+        # Verifica e remove duplicidade
         if dict["duplicidade"]:
             publico = publico.dropDuplicates(dict["duplicidade"])
-            
-        publico.select(min(self.chave_temporal), max(self.chave_temporal)).show()
-        
+      
         return publico
     
     
     # Módulo de construção de variáveis
     def bookedAs(self, lst):
-        vars_com_origem = [var for var in lst if var["origem"]]
-        vars_sem_origem = [var for var in lst if not var["origem"]]
+        vars_com_origem = [var for var in lst if var["origem"] and var["nome"] not in self.Dataframe.columns]
+        vars_sem_origem = [var for var in lst if not var["origem"] and var["nome"] not in self.Dataframe.columns]
         
         # Inicia a construção das variáveis que possuem origem
         for info in vars_com_origem:
@@ -57,9 +63,8 @@ class Book(Dataform):
             publico = self.__buildPublic__(info)
             
             # Etapa 02 - Agregação
-            agreg = publico.groupBy(self.chave_primaria).agg(info["agregacao"].alias(info["nome"]))
+            agreg = publico.groupBy(self.chave_primaria).agg(expr(info["agregacao"]).alias(info["nome"]))
             
             # Etapa 03 - Recupera Público
             self.Dataframe = self.Dataframe.join(agreg, on = [self.chave_primaria], how = "left")
             
-    
