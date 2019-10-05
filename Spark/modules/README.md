@@ -3,7 +3,7 @@
 
 >__Descrição__: Objeto python criado para facililtar na manipulação e tratamento de dados em camadas que recebem diretamente os dados brutos (pousos).
 
->__Parâmetros de Instanciação__: Um Dataframe de origem / Uma lista de dicionários representando o Metadados (opcional).
+>__Parâmetros de Instanciação__: Um Dataframe de origem / Uma lista de dicionários representando o Metadados (opicional).
 
 >__Módulos__: O objeto é divido em módulos únicos com suas próprias funcionalidades. Estes por sua vez são:
 
