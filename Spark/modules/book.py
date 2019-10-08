@@ -22,7 +22,12 @@ class Book(Dataform):
             self.Metadata = Metadata
             
             # A partir do metadados fornecido pelo usuário iniciaremos a construção do book
-            pass
+            # Primeiramente iniciaremos fazendo o depara da tipagem dos dados
+            for info in self.Metadata:
+              info["tipo"] = self.depara[info["tipo"]]
+            
+            # Depois daremos início ao processo de ETL
+            self.bookedAs(self.Metadata, imported_metadata=True)
     
     
     # Retorna o Público
@@ -33,11 +38,12 @@ class Book(Dataform):
     
     # Método de atualização do metadados (Book)
     def __updateMetadata__(self, col_list, dict_list):
-
+      
       # Verifica e insere informações novas
       for coluna in [nova_coluna for nova_coluna in col_list if nova_coluna not in self.Dataframe.columns]:
         self.Metadata.append({"nome": coluna, "origem": None, "tipo": "StringType()", "valor_se_nulo": None, "dominio": None, "transformacao": None, 
-                              "filtro": None, "janela_de_tempo": None, "variavel_temporal": None, "agregacao": None, "duplicidade": None, "versao": self.ref})
+                              "filtro": None, "janela_de_tempo": None, "variavel_temporal": None, "agregacao": None, "duplicidade": None, 
+                              "versao": self.ref})
 
       # Atualiza de fato o metadados
       for info in self.Metadata:
@@ -62,8 +68,8 @@ class Book(Dataform):
     
     
     # Realiza extração dos dados
-    def __extractor__(self, ref, dict):
-      
+    def __extractAs__(self, ref, dict):
+        
         # Aplica filtro(s) na origem caso necessário
         if dict["filtro"]:
           filtrada = self.Origem.select(self.chave_primaria, dict["origem"], dict["variavel_temporal"]).filter(dict["filtro"])
@@ -93,42 +99,94 @@ class Book(Dataform):
         return extracao.withColumn(self.chave_temporal, lit(ref))
     
     
+    # Realiza agregação dos dados
+    def __aggregateAs__(self, extracao, info):
+      
+      agregacao = extracao.groupBy(self.chave_primaria, self.chave_temporal).agg(expr(info["agregacao"]).alias(info["nome"]))
+      return agregacao
+    
+    
+    # Recupera o público e constrói o Book
+    def __buildAs__(self, agregacao):
+      
+      self.Dataframe = self.Dataframe.join(agregacao, on = [self.chave_primaria, self.chave_temporal], how = "left").orderBy(self.chave_primaria, self.chave_temporal)
+    
+    
+    # Aplica o dataforming sobre o Book
+    def __dataformAs__(self, info, imported_metadata):
+      
+      self.transformedAs({info["nome"]: info["transformacao"]}, imported_metadata)
+      self.coalescedAs({info["nome"]: info["valor_se_nulo"]}, imported_metadata)
+      self.castedAs({info["nome"]: info["tipo"]}, imported_metadata)
+      self.domainAs({info["nome"]: info["dominio"]}, imported_metadata)
+    
+    
+    # Acoplamento dos módulos: Extractor, Aggregator , Builder e Dataformer
+    def __ETL__(self, info, vetor_de_datas, imported_metadata):
+      
+      aux = vetor_de_datas.copy()
+            
+      # Etapa 03 - Extração
+      extracao = self.__extractAs__(aux[0], info)
+      aux.remove(aux[0])
+
+      for ref in vetor_de_datas:
+        extracao = extracao.union(self.__extractAs__(ref, info))
+      
+      # Etapa 04 - Agregação
+      agregacao = self.__aggregateAs__(extracao, info)
+      
+      # Etapa 05 - Recupera Público
+      self.__buildAs__(agregacao)
+      
+      # Etapa 06 - Dataforming
+      self.__dataformAs__(info, imported_metadata)
+    
+    
     # Módulo de construção de variáveis
-    def bookedAs(self, lst):
+    def bookedAs(self, lst, imported_metadata=False):
         
         vars_com_origem = [var for var in lst if var["origem"] and var["nome"] not in self.Dataframe.columns]
         vars_sem_origem = [var for var in lst if not var["origem"] and var["nome"] not in self.Dataframe.columns]
         
         # Etapa 01 - Insere no metadados as informações das variáveis novas
-        variaveis = [var["nome"] for var in lst if var["nome"] not in self.Dataframe.columns]
-        self.__updateMetadata__(variaveis, lst)
+        if not imported_metadata:
+          variaveis = [var["nome"] for var in vars_com_origem]
+          self.__updateMetadata__(variaveis, vars_com_origem)
         
         # Etapa 02 - Gera vetor de datas para extração a partir do público
         vetor_de_datas = [str(data[self.chave_temporal]) for data in self.Publico.select(self.chave_temporal).orderBy(self.chave_temporal).dropDuplicates().collect()]
             
-        # Inicia a construção das variáveis que possuem origem
+        # Inicia a construção das variáveis de grau menor ou iguais a um
         for info in vars_com_origem:
+          
+          self.__ETL__(info, vetor_de_datas, imported_metadata)
+        
+        # Inicia a construção das variáveis de grau maior ou iguais a 2
+        index = 0
+        while vars_sem_origem:
+          
+          info = vars_sem_origem[index]
+          
+          try:
+            # Verificamos se a variável necessita de agregação, dado que, variáveis deste tipo agregam como base de origem o próprio Book
+            if info["agregacao"]:
+              self.__updateMetadata__([info["nome"]], [info])
+              extracao = self.Dataframe
+
+              # Filtramos o próprio Book se necessário
+              if info["filtro"]:
+                extracao = extracao.filter(info["filtro"])
+
+              # Realiza agregação e a recuperação do público
+              agregacao = self.__aggregateAs__(extracao, info)
+              self.__buildAs__(agregacao)
+
+            self.__dataformAs__(info, imported_metadata)
+            vars_sem_origem.remove(info)
+            index = 0
+          except:
+            index += 1
             
-            aux = vetor_de_datas.copy()
             
-            # Etapa 03 - Extração
-            extracao = self.__extractor__(aux[0], info)
-            aux.remove(aux[0])
-            
-            for ref in vetor_de_datas:
-                extracao = extracao.union(self.__extractor__(ref, info))
-                
-            # Etapa 04 - Agregação
-            agregacao = extracao.groupBy(self.chave_primaria, self.chave_temporal).agg(expr(info["agregacao"]).alias(info["nome"]))
-            
-            # Etapa 05 - Recupera Público
-            self.Dataframe = self.Dataframe.join(agregacao, on = [self.chave_primaria, self.chave_temporal], how = "left")
-            
-            # Etapa 06 - Executa os módulos do objeto Dataform
-            self.transformedAs({info["nome"]: info["transformacao"]})
-            self.coalescedAs({info["nome"]: info["valor_se_nulo"]})
-            self.castedAs({info["nome"]: info["tipo"]})
-            self.domainAs({info["nome"]: info["dominio"]})
-            
-            
-            
+# end of class
