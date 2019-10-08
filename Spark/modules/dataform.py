@@ -79,6 +79,7 @@ class Dataform:
             
   # Método de atualização do metadados
   def __updateMetadata__(self, col_list, dict_list):
+    
     # Verifica e insere informações novas
     for coluna in [nova_coluna for nova_coluna in col_list if nova_coluna not in self.Dataframe.columns]:
       self.Metadata.append({"nome": coluna, "origem": None, "tipo": "StringType()", "valor_se_nulo": None, "dominio": None, "transformacao": None, "versao": self.ref})
@@ -95,6 +96,7 @@ class Dataform:
       
   # Método de construção do dataframe para o metadados
   def __buildMetadataDF__(self):
+    
     # Construção do header
     meta_header = []
     for chave in self.Metadata[0].keys():
@@ -111,7 +113,6 @@ class Dataform:
       
     # Constrói o dataframe
     meta_DF = spark.createDataFrame(lst_rows, meta_header)
-
     return meta_DF
     
     
@@ -127,6 +128,7 @@ class Dataform:
   
   # Módulo 01 - Alteração de tipagem dos campos
   def castedAs(self, dict, imported_metadata=False):
+    
     lst_casted = []
     
     for coluna in self.Dataframe.columns:
@@ -140,11 +142,11 @@ class Dataform:
       lst_casted.append(aliased)
       
     self.Dataframe = self.Dataframe.select(lst_casted)
-    return self.Dataframe
   
   
   # Módulo 02 - Tratamento de valores nulos
   def coalescedAs(self, dict, imported_metadata=False):
+    
     lst_coalesced = []
     
     for coluna in self.Dataframe.columns:
@@ -164,31 +166,30 @@ class Dataform:
       lst_coalesced.append(aliased)
         
     self.Dataframe = self.Dataframe.select(lst_coalesced)
-    return self.Dataframe
   
   
   # Módulo 03 - Captura ou inserção da listagem de domínios
   def domainAs(self, dict, imported_metadata=False):
+    
     if not imported_metadata:
       for info in self.Metadata:
         if info["nome"] in dict.keys():
           # Verifica se necessitamos gerar este domínio através de um agrupamento na variável
           try:
-            dominio = []
-            valores = self.Dataframe.select(dict[info["nome"]]).distinct().collect()
+            dominio = ""
+            valores = self.Dataframe.select(dict[info["nome"]]).orderBy(dict[info["nome"]]).dropDuplicates().collect()
 
             for valor in valores:
-              dominio.append(valor[info["nome"]])
-            info["dominio"] = dominio
+              dominio += str(valor[info["nome"]]) + ", "
+            info["dominio"] = dominio[:-2]
           except:
             info["dominio"] = dict[info["nome"]]
           info["versao"] = self.ref
-          
-    return self.Metadata
   
   
   # Módulo 04 - Aplica transformações em colunas existentes ou cria colunas novas
   def transformedAs(self, dict, imported_metadata=False):
+    
     lst_transformed = []
     
     # Caso 01 - Coluna já existente no dataframe
@@ -211,11 +212,11 @@ class Dataform:
         self.__updateMetadata__([coluna], [{"transformacao": dict[coluna], "versao": self.ref}])
         
     self.Dataframe = self.Dataframe.select(lst_transformed)
-    return self.Dataframe
   
   
   # Módulo 05 - Renomeação de variáveis
   def namedAs(self, dict, imported_metadata=False):
+    
     lst_named = []
     
     for coluna in self.Dataframe.columns:
@@ -228,11 +229,11 @@ class Dataform:
       lst_named.append(aliased)
     
     self.Dataframe = self.Dataframe.select(lst_named)
-    return self.Dataframe
   
   
   # Visualização do Metadados
   def viewMetadata(self, truncate=True):
+    
     meta_DF = self.__buildMetadataDF__()
     meta_DF = meta_DF.select(col("nome").alias("Nome"), col("origem").alias("Origem"), col("tipo").alias("Tipo"), col("valor_se_nulo").alias("Valor/Expressão(SQL) se Nulo"), 
                              col("dominio").alias("Domínio"), col("transformacao").alias("Transformação(SQL)"), col("versao").alias("Versão"))
@@ -242,6 +243,7 @@ class Dataform:
   
   # Exportação do metadados para um diretório especificado pelo usuário
   def saveMetadata(self, dir):
+    
     meta_DF = self.__buildMetadataDF__()
     meta_DF.coalesce(1).write.mode("overwrite").format("json").save(dir)
     
