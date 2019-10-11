@@ -52,15 +52,14 @@ class Dataform:
           except:
             infos_de_grau_maiorigual_um.append(info)
             
-        # Agora os casos que possuem origem
+       # Agora os casos que possuem origem
         for info in infos_com_origem:
           self.transformedAs({info["origem"]: info["transformacao"]}, True)
           self.coalescedAs({info["origem"]: info["valor_se_nulo"]}, True)
           self.castedAs({info["origem"]: self.depara[info["tipo"]]}, True)
           self.domainAs({info["origem"]: info["dominio"]}, True)
-          self.namedAs({info["origem"]: info["nome"]}, True)
           
-        # Por fim executa os módulos para as variáveis de grau maior ou iguais a 1
+        # Executa os módulos para as variáveis de grau maior ou iguais a 1
         index = 0
         
         while infos_de_grau_maiorigual_um:
@@ -76,6 +75,10 @@ class Dataform:
           except:
             index += 1
 
+        # Por fim executa o módulo Namer para as variáveis com origem
+        for info in infos_com_origem:
+            self.namedAs({info["origem"]: info["nome"]}, True)
+            
             
   # Método de atualização do metadados
   def __updateMetadata__(self, col_list, dict_list):
