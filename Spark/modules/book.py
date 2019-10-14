@@ -130,7 +130,7 @@ class Book(Dataform):
       extracao = self.__extractAs__(aux[0], info)
       aux.remove(aux[0])
 
-      for ref in vetor_de_datas:
+      for ref in aux:
         extracao = extracao.union(self.__extractAs__(ref, info))
       
       # Etapa 04 - Agregação
