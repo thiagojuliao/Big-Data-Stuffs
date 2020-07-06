@@ -12,12 +12,12 @@ def lambda_handler(event, context):
     
     s3 = boto3.resource("s3")
     buffer = s3.Object(
-        "dev-development-content-wavy", 
-        "whatsapp/buffer_{}.json".format(dt_ref_tag)
+        "BUCKET_NAME", 
+        "SUB_FOLDER/buffer_{}.json".format(dt_ref_tag)
         )
     old_buffer = s3.Object(
-        "dev-development-content-wavy",
-        "whatsapp/buffer_{}.json".format(dt_old_tag)
+        "BUCKET_NAME",
+        "SUB_FOLDER/buffer_{}.json".format(dt_old_tag)
         )
     max_buffer_size = 0.005 * 1024 * 1024 # Valor em MB
     
